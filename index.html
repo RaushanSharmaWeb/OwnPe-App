@@ -3,63 +3,277 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Ownpe - Raushan Sharma</title>
+    <title>Ownpe - Payment App</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-        /* Hide scrollbar for clean app look */
         ::-webkit-scrollbar { width: 0px; background: transparent; }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+        /* Scanner animation */
+        @keyframes scan { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(192px); } }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 h-screen overflow-hidden flex">
 
-    <!-- PC/Tablet Sidebar Navigation (Hidden on Mobile) -->
-    <aside class="hidden md:flex flex-col w-64 bg-indigo-700 text-white shadow-xl z-20">
-        <div class="p-6 flex items-center gap-3 border-b border-indigo-600">
-            <div class="bg-white text-indigo-700 font-bold p-2 rounded-lg text-xl"><i class="fa-solid fa-wallet"></i></div>
-            <h2 class="text-2xl font-bold tracking-wider">Ownpe</h2>
-        </div>
-        <nav class="flex-1 px-4 py-6 space-y-2">
-            <button onclick="switchTab('home')" class="nav-btn-desktop w-full flex items-center gap-4 px-4 py-3 rounded-xl bg-indigo-800 transition-colors" data-target="home">
-                <i class="fa-solid fa-house w-5"></i> Dashboard
-            </button>
-            <button onclick="switchTab('scan')" class="nav-btn-desktop w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-indigo-600 transition-colors" data-target="scan">
-                <i class="fa-solid fa-qrcode w-5"></i> Scan QR
-            </button>
-            <button onclick="switchTab('pay')" class="nav-btn-desktop w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-indigo-600 transition-colors" data-target="pay">
-                <i class="fa-solid fa-mobile-screen w-5"></i> Pay Number
-            </button>
-            <button onclick="switchTab('history')" class="nav-btn-desktop w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-indigo-600 transition-colors" data-target="history">
-                <i class="fa-solid fa-receipt w-5"></i> History
-            </button>
-            <button onclick="switchTab('profile')" class="nav-btn-desktop w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-indigo-600 transition-colors" data-target="profile">
-                <i class="fa-regular fa-user w-5"></i> Profile
-            </button>
-        </nav>
-        <div class="p-4 border-t border-indigo-600 text-sm text-indigo-300 text-center">
-            Secured by Ownpe Server
-        </div>
-    </aside>
+    <!-- ========================================== -->
+    <!-- 1. LOGIN / AUTHENTICATION SCREEN -->
+    <!-- ========================================== -->
+    <div id="auth-screen" class="absolute inset-0 bg-white z-[100] flex flex-col justify-center items-center px-6 transition-all duration-500">
+        <div class="w-full max-w-sm text-center">
+            <div class="bg-indigo-600 text-white w-20 h-20 rounded-2xl mx-auto flex justify-center items-center text-4xl mb-6 shadow-lg">
+                <i class="fa-solid fa-wallet"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">OwnPe</h1>
+            <p class="text-gray-500 mb-8 font-medium">India's most secure payment app</p>
 
-    <!-- Main Content Area -->
-    <main class="flex-1 h-full overflow-y-auto relative pb-20 md:pb-0">
+            <div id="phone-input-section" class="bg-gray-50 p-6 rounded-3xl border border-gray-100 shadow-sm">
+                <label class="block text-left text-sm font-bold text-gray-700 mb-2">Mobile Number</label>
+                <div class="relative mb-6">
+                    <span class="absolute left-4 top-3.5 text-gray-500 font-bold">+91</span>
+                    <input type="tel" id="phone-number" placeholder="9876543210" class="w-full bg-white border border-gray-200 rounded-xl py-3 pl-14 pr-4 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 text-lg font-bold tracking-wide">
+                </div>
+                <!-- This div is required for Firebase reCAPTCHA -->
+                <div id="recaptcha-container" class="mb-4 flex justify-center"></div>
+                <button onclick="sendOTP()" class="w-full bg-indigo-600 text-white font-bold text-lg py-4 rounded-xl shadow-md hover:bg-indigo-700 active:scale-95 transition-all">
+                    Get OTP
+                </button>
+            </div>
+
+            <div id="otp-input-section" class="hidden bg-gray-50 p-6 rounded-3xl border border-gray-100 shadow-sm mt-4">
+                <label class="block text-left text-sm font-bold text-gray-700 mb-2">Enter OTP</label>
+                <input type="number" id="otp-code" placeholder="123456" class="w-full bg-white border border-gray-200 rounded-xl py-3 px-4 focus:outline-none focus:border-indigo-500 text-center text-2xl tracking-widest font-bold mb-6">
+                <button onclick="verifyOTP()" class="w-full bg-green-600 text-white font-bold text-lg py-4 rounded-xl shadow-md hover:bg-green-700 active:scale-95 transition-all">
+                    Verify & Login
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 2. MAIN APP DASHBOARD (Hidden until login) -->
+    <!-- ========================================== -->
+    <div id="main-app" class="hidden w-full h-full flex">
         
-        <!-- PAGE 1: HOME DASHBOARD -->
-        <div id="page-home" class="page-section animate-fade-in block">
-            <!-- Header -->
-            <div class="bg-indigo-600 md:bg-white md:border-b text-white md:text-gray-800 rounded-b-3xl md:rounded-none pt-8 pb-6 px-6 md:px-10 shadow-sm transition-all">
-                <div class="flex justify-between items-center md:max-w-5xl mx-auto">
-                    <div class="flex items-center gap-4">
-                        <div class="w-14 h-14 bg-white md:bg-indigo-100 text-indigo-600 rounded-full flex justify-center items-center font-bold text-2xl border-2 border-indigo-200 shadow-sm">
-                            RS
+        <!-- PC Sidebar -->
+        <aside class="hidden md:flex flex-col w-64 bg-indigo-700 text-white shadow-xl z-20">
+            <div class="p-6 flex items-center gap-3 border-b border-indigo-600">
+                <div class="bg-white text-indigo-700 font-bold p-2 rounded-lg text-xl"><i class="fa-solid fa-wallet"></i></div>
+                <h2 class="text-2xl font-bold tracking-wider">OwnPe</h2>
+            </div>
+            <nav class="flex-1 px-4 py-6 space-y-2">
+                <button onclick="switchTab('home')" class="nav-btn-desktop w-full flex items-center gap-4 px-4 py-3 rounded-xl bg-indigo-800 transition-colors" data-target="home"><i class="fa-solid fa-house w-5"></i> Dashboard</button>
+                <button onclick="switchTab('scan')" class="nav-btn-desktop w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-indigo-600 transition-colors" data-target="scan"><i class="fa-solid fa-qrcode w-5"></i> Scan QR</button>
+                <button onclick="switchTab('pay')" class="nav-btn-desktop w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-indigo-600 transition-colors" data-target="pay"><i class="fa-solid fa-mobile-screen w-5"></i> Pay Number</button>
+                <button onclick="switchTab('history')" class="nav-btn-desktop w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-indigo-600 transition-colors" data-target="history"><i class="fa-solid fa-receipt w-5"></i> History</button>
+                <button onclick="switchTab('profile')" class="nav-btn-desktop w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-indigo-600 transition-colors" data-target="profile"><i class="fa-regular fa-user w-5"></i> Profile</button>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 h-full overflow-y-auto relative pb-20 md:pb-0">
+            <!-- PAGE: HOME -->
+            <div id="page-home" class="page-section animate-fade-in block">
+                <div class="bg-indigo-600 md:bg-white md:border-b text-white md:text-gray-800 rounded-b-3xl md:rounded-none pt-8 pb-6 px-6 md:px-10 shadow-sm transition-all">
+                    <div class="flex justify-between items-center md:max-w-5xl mx-auto">
+                        <div class="flex items-center gap-4">
+                            <div class="w-14 h-14 bg-white md:bg-indigo-100 text-indigo-600 rounded-full flex justify-center items-center font-bold text-2xl border-2 border-indigo-200">RS</div>
+                            <div>
+                                <h1 class="text-xl font-bold">Hi, Raushan Sharma</h1>
+                                <div class="flex items-center gap-2 text-indigo-100 md:text-gray-500 text-sm mt-1">
+                                    <span class="bg-indigo-700 md:bg-gray-100 px-2 py-1 rounded-md font-mono text-xs">8130589437@ownpe</span>
+                                    <i class="fa-regular fa-copy cursor-pointer hover:text-indigo-300"></i>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <h1 class="text-xl font-bold">Hi, Raushan Sharma</h1>
-                            <div class="flex items-center gap-2 text-indigo-100 md:text-gray-500 text-sm mt-1">
-                                <span class="bg-indigo-700 md:bg-gray-100 px-2 py-1 rounded-md font-mono text-xs">8130589437@ownpe</span>
+                    </div>
+                </div>
+
+                <div class="px-6 md:px-10 md:max-w-5xl mx-auto mt-6">
+                    <div class="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 flex justify-between items-center mb-8">
+                        <div class="flex items-center gap-4">
+                            <div class="bg-indigo-50 text-indigo-600 w-12 h-12 rounded-full flex justify-center items-center text-xl"><i class="fa-solid fa-building-columns"></i></div>
+                            <div>
+                                <h2 class="font-bold text-lg">Check Bank Balance</h2>
+                                <p class="text-sm text-gray-500">State Bank of India</p>
+                            </div>
+                        </div>
+                        <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700">Check</button>
+                    </div>
+
+                    <h3 class="font-bold text-lg mb-4 text-gray-700">Transfer Money</h3>
+                    <div class="grid grid-cols-3 gap-4 mb-8">
+                        <div onclick="switchTab('scan')" class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-3 cursor-pointer"><div class="bg-blue-50 text-blue-600 w-14 h-14 rounded-full flex justify-center items-center text-2xl"><i class="fa-solid fa-qrcode"></i></div><span class="text-xs md:text-sm font-semibold">Scan QR</span></div>
+                        <div onclick="switchTab('pay')" class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-3 cursor-pointer"><div class="bg-purple-50 text-purple-600 w-14 h-14 rounded-full flex justify-center items-center text-2xl"><i class="fa-solid fa-mobile-screen"></i></div><span class="text-xs md:text-sm font-semibold">Pay Number</span></div>
+                        <div onclick="switchTab('history')" class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center gap-3 cursor-pointer"><div class="bg-orange-50 text-orange-600 w-14 h-14 rounded-full flex justify-center items-center text-2xl"><i class="fa-solid fa-clock-rotate-left"></i></div><span class="text-xs md:text-sm font-semibold">History</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAGE: SCAN -->
+            <div id="page-scan" class="page-section hidden h-full flex flex-col justify-center items-center px-6">
+                <h2 class="text-2xl font-bold mb-6 text-gray-800">Scan Any QR Code</h2>
+                <div class="relative bg-black w-full max-w-sm h-80 rounded-3xl overflow-hidden flex justify-center items-center border-4 border-gray-800">
+                    <div class="w-48 h-48 border-2 border-indigo-400 relative z-10 animate-pulse">
+                        <div class="w-full h-0.5 bg-indigo-500 shadow-[0_0_10px_#6366f1] animate-[scan_2s_ease-in-out_infinite]"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAGE: PAY -->
+            <div id="page-pay" class="page-section hidden px-6 py-10 md:max-w-xl mx-auto">
+                <div class="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
+                    <h2 class="text-2xl font-bold mb-6 text-gray-800"><i class="fa-solid fa-mobile-screen text-indigo-600"></i> Pay to Number</h2>
+                    <div class="mb-6">
+                        <label class="block text-sm font-semibold text-gray-600 mb-2">Enter Mobile Number</label>
+                        <input type="tel" placeholder="Number / OwnPe ID" class="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 px-4 focus:outline-none focus:border-indigo-500 font-semibold">
+                    </div>
+                    <div class="mb-8">
+                        <label class="block text-sm font-semibold text-gray-600 mb-2">Amount (₹)</label>
+                        <input type="number" placeholder="0" class="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 px-4 focus:outline-none focus:border-indigo-500 text-2xl font-bold text-center">
+                    </div>
+                    <button class="w-full bg-indigo-600 text-white font-bold text-lg py-4 rounded-xl shadow-md">Proceed to Pay</button>
+                </div>
+            </div>
+
+            <!-- PAGE: PROFILE -->
+            <div id="page-profile" class="page-section hidden px-6 py-10 md:max-w-2xl mx-auto">
+                <h2 class="text-2xl font-bold mb-6 text-gray-800">My Profile</h2>
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 mb-6 flex items-center gap-6">
+                    <div class="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex justify-center items-center font-bold text-3xl">RS</div>
+                    <div>
+                        <h3 class="font-bold text-xl text-gray-800">Raushan Sharma</h3>
+                        <p class="text-gray-500 font-mono">8130589437@ownpe</p>
+                    </div>
+                </div>
+                <button onclick="logout()" class="w-full bg-red-50 text-red-600 font-bold py-4 rounded-xl">Logout</button>
+            </div>
+            
+            <!-- PAGE: HISTORY -->
+            <div id="page-history" class="page-section hidden px-6 py-10 md:max-w-2xl mx-auto">
+                <h2 class="text-2xl font-bold mb-6 text-gray-800">History</h2>
+                <p class="text-gray-500 text-center mt-10">No transactions yet.</p>
+            </div>
+        </main>
+
+        <!-- Mobile Bottom Nav -->
+        <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3 flex justify-between items-center z-50 pb-safe">
+            <div onclick="switchTab('home')" class="nav-btn-mobile flex flex-col items-center cursor-pointer text-indigo-600" data-target="home"><i class="fa-solid fa-house text-xl mb-1"></i><span class="text-[10px] font-bold">Home</span></div>
+            <div onclick="switchTab('scan')" class="nav-btn-mobile flex flex-col items-center cursor-pointer text-gray-400" data-target="scan"><i class="fa-solid fa-qrcode text-xl mb-1"></i><span class="text-[10px] font-bold">Scan</span></div>
+            <div onclick="switchTab('pay')" class="nav-btn-mobile flex flex-col items-center cursor-pointer text-gray-400" data-target="pay"><i class="fa-solid fa-mobile-screen text-xl mb-1"></i><span class="text-[10px] font-bold">Pay No.</span></div>
+            <div onclick="switchTab('history')" class="nav-btn-mobile flex flex-col items-center cursor-pointer text-gray-400" data-target="history"><i class="fa-solid fa-receipt text-xl mb-1"></i><span class="text-[10px] font-bold">History</span></div>
+            <div onclick="switchTab('profile')" class="nav-btn-mobile flex flex-col items-center cursor-pointer text-gray-400" data-target="profile"><i class="fa-regular fa-user text-xl mb-1"></i><span class="text-[10px] font-bold">Profile</span></div>
+        </nav>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 3. FIREBASE & SUPABASE LOGIC -->
+    <!-- ========================================== -->
+    <script type="module">
+        // --- FIREBASE INITIALIZATION ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+        import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, signOut } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCLOoCsXzHDksUh03nTOFl3z7qkkuE5lds",
+            authDomain: "ownpe-2cd89.firebaseapp.com",
+            projectId: "ownpe-2cd89",
+            storageBucket: "ownpe-2cd89.firebasestorage.app",
+            messagingSenderId: "931689793551",
+            appId: "1:931689793551:web:74a39a6a2227e27357fb7a"
+        };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // --- SUPABASE INITIALIZATION ---
+        const supabaseUrl = 'https://qvvhkzufmafkuhtsxkgn.supabase.co';
+        const supabaseKey = 'sb_publishable_D8Rk1i6UCOQzJNDtEMO3jg_zZzeLyGR';
+        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+        // --- AUTHENTICATION LOGIC ---
+        window.confirmationResult = null;
+
+        // 1. Setup Recaptcha
+        window.setupRecaptcha = () => {
+            if (!window.recaptchaVerifier) {
+                window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+                    'size': 'normal',
+                    'callback': (response) => { console.log("Recaptcha verified"); }
+                });
+            }
+        };
+
+        // 2. Send OTP
+        window.sendOTP = () => {
+            const phoneNumber = "+91" + document.getElementById("phone-number").value;
+            window.setupRecaptcha();
+            const appVerifier = window.recaptchaVerifier;
+
+            signInWithPhoneNumber(auth, phoneNumber, appVerifier)
+                .then((result) => {
+                    window.confirmationResult = result;
+                    document.getElementById("phone-input-section").classList.add("hidden");
+                    document.getElementById("otp-input-section").classList.remove("hidden");
+                    alert("OTP Sent Successfully!");
+                }).catch((error) => {
+                    console.error("SMS not sent", error);
+                    alert("Error sending OTP. Check console.");
+                });
+        };
+
+        // 3. Verify OTP & Login
+        window.verifyOTP = () => {
+            const code = document.getElementById("otp-code").value;
+            window.confirmationResult.confirm(code).then((result) => {
+                const user = result.user;
+                console.log("Logged in user:", user.uid);
+                
+                // Hide Auth screen, Show Main App
+                document.getElementById("auth-screen").classList.add("hidden");
+                document.getElementById("main-app").classList.remove("hidden");
+                
+                // Future step: Insert user.uid into Supabase 'users' table here
+                
+            }).catch((error) => {
+                alert("Invalid OTP!");
+            });
+        };
+
+        // 4. Logout
+        window.logout = () => {
+            signOut(auth).then(() => {
+                document.getElementById("main-app").classList.add("hidden");
+                document.getElementById("auth-screen").classList.remove("hidden");
+                document.getElementById("phone-input-section").classList.remove("hidden");
+                document.getElementById("otp-input-section").classList.add("hidden");
+            });
+        };
+
+        // --- UI NAVIGATION LOGIC ---
+        window.switchTab = (tabId) => {
+            document.querySelectorAll('.page-section').forEach(page => {
+                page.classList.add('hidden'); page.classList.remove('block');
+            });
+            const targetPage = document.getElementById('page-' + tabId);
+            if(targetPage) { targetPage.classList.remove('hidden'); targetPage.classList.add('block'); }
+
+            document.querySelectorAll('.nav-btn-mobile').forEach(btn => {
+                if(btn.dataset.target === tabId) { btn.classList.add('text-indigo-600'); btn.classList.remove('text-gray-400'); } 
+                else { btn.classList.remove('text-indigo-600'); btn.classList.add('text-gray-400'); }
+            });
+            document.querySelectorAll('.nav-btn-desktop').forEach(btn => {
+                if(btn.dataset.target === tabId) { btn.classList.add('bg-indigo-800'); btn.classList.remove('hover:bg-indigo-600'); } 
+                else { btn.classList.remove('bg-indigo-800'); btn.classList.add('hover:bg-indigo-600'); }
+            });
+        };
+    </script>
+</body>
+</html>
                                 <i class="fa-regular fa-copy cursor-pointer hover:text-indigo-300" onclick="alert('Ownpe ID Copied!')"></i>
                             </div>
                         </div>
