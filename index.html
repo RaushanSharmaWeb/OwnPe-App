@@ -198,21 +198,34 @@
         // --- AUTHENTICATION LOGIC ---
         window.confirmationResult = null;
 
-        // 1. Setup Recaptcha
+                // 1. Setup Recaptcha (इसे 'invisible' कर दिया गया है)
         window.setupRecaptcha = () => {
             if (!window.recaptchaVerifier) {
                 window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-                    'size': 'normal',
+                    'size': 'invisible', 
                     'callback': (response) => { console.log("Recaptcha verified"); }
                 });
             }
         };
 
-        // 2. Send OTP
+        // 2. Send OTP (असली एरर स्क्रीन पर दिखाने के लिए अपडेट किया)
         window.sendOTP = () => {
-            const phoneNumber = "+91" + document.getElementById("phone-number").value;
+            const numInput = document.getElementById("phone-number").value;
+            
+            // चेक करें कि नंबर 10 अंकों का है या नहीं
+            if(numInput.length !== 10) {
+                alert("Please enter a valid 10-digit mobile number.");
+                return;
+            }
+            
+            const phoneNumber = "+91" + numInput;
             window.setupRecaptcha();
             const appVerifier = window.recaptchaVerifier;
+
+            // बटन दबाते ही टेक्स्ट बदल दें ताकि पता चले लोडिंग हो रही है
+            const btn = document.querySelector("button[onclick='sendOTP()']");
+            const originalText = btn.innerText;
+            btn.innerText = "Sending...";
 
             signInWithPhoneNumber(auth, phoneNumber, appVerifier)
                 .then((result) => {
@@ -222,9 +235,20 @@
                     alert("OTP Sent Successfully!");
                 }).catch((error) => {
                     console.error("SMS not sent", error);
-                    alert("Error sending OTP. Check console.");
+                    // यह लाइन अब स्क्रीन पर असली एरर बताएगी!
+                    alert("Firebase Error: " + error.message); 
+                    
+                    // अगर कैप्चा फेल होता है, तो उसे रीसेट करें
+                    if(window.recaptchaVerifier) {
+                        window.recaptchaVerifier.render().then(function(widgetId) {
+                            grecaptcha.reset(widgetId);
+                        });
+                    }
+                    btn.innerText = originalText;
                 });
         };
+        
+
 
         // 3. Verify OTP & Login
         window.verifyOTP = () => {
